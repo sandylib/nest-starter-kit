@@ -1,0 +1,21 @@
+export const HTTP_STATUS = {
+  SUCCESS: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  INTERNAL_SERVER_ERROR: 500,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503,
+} as const;
+
+export const HTTP_RESPONSE_DESCRIPTIONS = {
+  UNAUTHORIZED: "Unauthorized - Bearer token required",
+  INTERNAL_ERROR: "Internal server error",
+  BAD_GATEWAY: "Bad Gateway - External API returned an HTTP error",
+  SERVICE_UNAVAILABLE: "Service unavailable - External API error",
+  NO_CONTENT: "No Content - External API returned empty response",
+} as const;
