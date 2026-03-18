@@ -1,6 +1,8 @@
 # Nest Starter Kit
 
-NestJS starter kit with Clean Architecture, Prisma ORM, Swagger API documentation, and structured logging. Includes a shopping cart example domain to demonstrate patterns and conventions.
+NestJS starter kit with Clean Architecture, Prisma ORM, Swagger API documentation, and structured logging. Uses **Hexagonal Architecture (Ports & Adapters)** to decouple business logic from data access. Includes a shopping cart example domain to demonstrate patterns and conventions.
+
+> **Read the full article**: [Hexagonal Architecture in NestJS: Stop Mocking Prisma and Start Designing for Change](HEXAGONAL-ARCHITECTURE.md)
 
 ## Prerequisites
 
@@ -86,7 +88,8 @@ src/
 │   ├── entities/                        # Domain entities (pure interfaces)
 │   └── middleware/                       # Auth, logging middleware
 ├── application/                         # Application layer
-│   └── use-cases/                       # Service implementations
+│   ├── ports/                           # Repository interfaces (contracts) + DI tokens
+│   └── use-cases/                       # Service implementations (pure business logic)
 ├── presentation/                        # Presentation layer
 │   └── web/
 │       ├── controllers/                 # API controllers
@@ -99,7 +102,8 @@ src/
 │   ├── filters/                         # Exception filters
 │   ├── logging/                         # Logger setup
 │   ├── mappers/                         # Entity-DTO mappers
-│   └── modules/                         # NestJS modules
+│   ├── modules/                         # NestJS modules (wiring layer)
+│   └── repositories/                    # Port implementations (Prisma adapters)
 └── shared/                              # Cross-cutting concerns
     ├── constants/                       # Application constants
     │   ├── domains/                     # Domain-specific constants
@@ -111,21 +115,42 @@ src/
 
 ## Architecture
 
-This project follows **Clean Architecture** principles:
+This project follows **Clean Architecture** with **Hexagonal (Ports & Adapters)** principles:
 
 - **Core (Domain)**: Business entities and domain logic
-- **Application**: Use cases and business rules
+- **Application**: Use cases (pure business logic) and port interfaces (repository contracts)
 - **Presentation**: HTTP controllers, DTOs, and web layer
-- **Infrastructure**: External dependencies, adapters, configuration
+- **Infrastructure**: Repository adapters, external dependencies, configuration, and NestJS modules that bind ports to implementations
 - **Shared**: Constants, types, and utilities used across layers
 
-### Layer Dependencies
+### Layer Dependencies (Ports & Adapters)
+
+The application layer defines **port interfaces** that describe what data access it needs. The infrastructure layer provides **adapter implementations** that fulfil those contracts via Prisma, HTTP clients, or any other technology. Use-case services never import infrastructure classes directly.
 
 ```
-Presentation → Application → Infrastructure
-                    ↑
-                 Shared (used by all)
+              ┌─────────────────────────────────────┐
+              │          PRESENTATION               │
+              │  Controllers → DTOs → Decorators    │
+              └─────────────────┬───────────────────┘
+                                │ calls
+                                ▼
+              ┌─────────────────────────────────────┐
+              │          APPLICATION                 │
+              │  Use Cases (business logic only)     │
+              │  Port Interfaces (repository         │
+              │    contracts + injection tokens)      │
+              └──────────┬──────────────────────────┘
+                         │ depends on ports (interfaces)
+                         ▼
+              ┌─────────────────────────────────────┐
+              │         INFRASTRUCTURE               │
+              │  Repositories (implement ports)      │
+              │  BaseRepository (logging helper)     │
+              │  Adapters, Config, Modules           │
+              └─────────────────────────────────────┘
 ```
+
+See [HEXAGONAL-ARCHITECTURE.md](HEXAGONAL-ARCHITECTURE.md) for a detailed walkthrough.
 
 ## Example Domain: Shopping Cart
 

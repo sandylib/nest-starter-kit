@@ -1,29 +1,22 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaAdapter } from "../../infrastructure/adapters/prisma.adapter";
-import { LoggerProvider } from "../../infrastructure/logging/logger.provider";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { PRODUCT_REPOSITORY } from "../ports/injection-tokens";
+import { ProductRepository } from "../ports/product.repository";
+import { Product } from "../../core/entities/product.entity";
 import { BUSINESS_ERROR_MESSAGES } from "../../shared/constants/errors/business-errors.constants";
-import { LOGGING } from "../../shared/constants/logging.constants";
 
 @Injectable()
 export class ProductsService {
   constructor(
-    private readonly prisma: PrismaAdapter,
-    private readonly logger: LoggerProvider,
+    @Inject(PRODUCT_REPOSITORY)
+    private readonly productRepository: ProductRepository,
   ) {}
 
-  async findAll() {
-    this.logger.info("Fetching all products", LOGGING.CATEGORIES.API);
-    return this.prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+  async findAll(): Promise<Product[]> {
+    return this.productRepository.findAll();
   }
 
-  async findById(id: string) {
-    this.logger.info(`Fetching product ${id}`, LOGGING.CATEGORIES.API);
-
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-    });
+  async findById(id: string): Promise<Product> {
+    const product = await this.productRepository.findById(id);
 
     if (!product) {
       throw new NotFoundException(BUSINESS_ERROR_MESSAGES.PRODUCT_NOT_FOUND);
@@ -37,19 +30,8 @@ export class ProductsService {
     description?: string;
     price: number;
     stock?: number;
-  }) {
-    this.logger.info("Creating product", LOGGING.CATEGORIES.API, {
-      name: data.name,
-    });
-
-    return this.prisma.product.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        stock: data.stock ?? 0,
-      },
-    });
+  }): Promise<Product> {
+    return this.productRepository.create(data);
   }
 
   async update(
@@ -60,24 +42,13 @@ export class ProductsService {
       price?: number;
       stock?: number;
     },
-  ) {
+  ): Promise<Product> {
     await this.findById(id);
-
-    this.logger.info(`Updating product ${id}`, LOGGING.CATEGORIES.API);
-
-    return this.prisma.product.update({
-      where: { id },
-      data,
-    });
+    return this.productRepository.update(id, data);
   }
 
-  async remove(id: string) {
+  async remove(id: string): Promise<Product> {
     await this.findById(id);
-
-    this.logger.info(`Deleting product ${id}`, LOGGING.CATEGORIES.API);
-
-    return this.prisma.product.delete({
-      where: { id },
-    });
+    return this.productRepository.remove(id);
   }
 }

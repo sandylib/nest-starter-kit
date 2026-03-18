@@ -1,12 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
 import { ProductsService } from "../products.service";
-import { PrismaAdapter } from "../../../infrastructure/adapters/prisma.adapter";
-import { LoggerProvider } from "../../../infrastructure/logging/logger.provider";
+import { PRODUCT_REPOSITORY } from "../../ports/injection-tokens";
+import { ProductRepository } from "../../ports/product.repository";
 
 describe("ProductsService", () => {
   let service: ProductsService;
-  let prisma: jest.Mocked<PrismaAdapter>;
+  let productRepository: jest.Mocked<ProductRepository>;
 
   const mockProduct = {
     id: "test-uuid",
@@ -19,62 +19,56 @@ describe("ProductsService", () => {
   };
 
   beforeEach(async () => {
-    const mockPrisma = {
-      product: {
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-      },
-    };
-
-    const mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
+    const mockRepository: jest.Mocked<ProductRepository> = {
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductsService,
-        { provide: PrismaAdapter, useValue: mockPrisma },
-        { provide: LoggerProvider, useValue: mockLogger },
+        { provide: PRODUCT_REPOSITORY, useValue: mockRepository },
       ],
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
-    prisma = module.get(PrismaAdapter);
+    productRepository = module.get(PRODUCT_REPOSITORY);
   });
 
   describe("findAll", () => {
-    it("should return all products", async () => {
-      prisma.product.findMany.mockResolvedValue([mockProduct]);
+    it("should return all products from the repository", async () => {
+      productRepository.findAll.mockResolvedValue([mockProduct]);
 
       const result = await service.findAll();
 
       expect(result).toEqual([mockProduct]);
-      expect(prisma.product.findMany).toHaveBeenCalledWith({
-        orderBy: { createdAt: "desc" },
-      });
+      expect(productRepository.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return empty array when no products exist", async () => {
+      productRepository.findAll.mockResolvedValue([]);
+
+      const result = await service.findAll();
+
+      expect(result).toEqual([]);
     });
   });
 
   describe("findById", () => {
     it("should return a product by ID", async () => {
-      prisma.product.findUnique.mockResolvedValue(mockProduct);
+      productRepository.findById.mockResolvedValue(mockProduct);
 
       const result = await service.findById("test-uuid");
 
       expect(result).toEqual(mockProduct);
-      expect(prisma.product.findUnique).toHaveBeenCalledWith({
-        where: { id: "test-uuid" },
-      });
+      expect(productRepository.findById).toHaveBeenCalledWith("test-uuid");
     });
 
     it("should throw NotFoundException when product not found", async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      productRepository.findById.mockResolvedValue(null);
 
       await expect(service.findById("nonexistent")).rejects.toThrow(
         NotFoundException,
@@ -91,7 +85,7 @@ describe("ProductsService", () => {
         stock: 5,
       };
 
-      prisma.product.create.mockResolvedValue({
+      productRepository.create.mockResolvedValue({
         ...mockProduct,
         ...createData,
       });
@@ -99,38 +93,15 @@ describe("ProductsService", () => {
       const result = await service.create(createData);
 
       expect(result.name).toBe(createData.name);
-      expect(prisma.product.create).toHaveBeenCalledWith({
-        data: createData,
-      });
-    });
-
-    it("should default stock to 0 when not provided", async () => {
-      const createData = { name: "New Product", price: 19.99 };
-
-      prisma.product.create.mockResolvedValue({
-        ...mockProduct,
-        ...createData,
-        stock: 0,
-      });
-
-      await service.create(createData);
-
-      expect(prisma.product.create).toHaveBeenCalledWith({
-        data: {
-          name: "New Product",
-          price: 19.99,
-          stock: 0,
-          description: undefined,
-        },
-      });
+      expect(productRepository.create).toHaveBeenCalledWith(createData);
     });
   });
 
   describe("update", () => {
     it("should update a product", async () => {
       const updateData = { name: "Updated Product" };
-      prisma.product.findUnique.mockResolvedValue(mockProduct);
-      prisma.product.update.mockResolvedValue({
+      productRepository.findById.mockResolvedValue(mockProduct);
+      productRepository.update.mockResolvedValue({
         ...mockProduct,
         ...updateData,
       });
@@ -138,14 +109,14 @@ describe("ProductsService", () => {
       const result = await service.update("test-uuid", updateData);
 
       expect(result.name).toBe("Updated Product");
-      expect(prisma.product.update).toHaveBeenCalledWith({
-        where: { id: "test-uuid" },
-        data: updateData,
-      });
+      expect(productRepository.update).toHaveBeenCalledWith(
+        "test-uuid",
+        updateData,
+      );
     });
 
     it("should throw NotFoundException when product not found", async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      productRepository.findById.mockResolvedValue(null);
 
       await expect(
         service.update("nonexistent", { name: "Test" }),
@@ -155,19 +126,17 @@ describe("ProductsService", () => {
 
   describe("remove", () => {
     it("should delete a product", async () => {
-      prisma.product.findUnique.mockResolvedValue(mockProduct);
-      prisma.product.delete.mockResolvedValue(mockProduct);
+      productRepository.findById.mockResolvedValue(mockProduct);
+      productRepository.remove.mockResolvedValue(mockProduct);
 
       const result = await service.remove("test-uuid");
 
       expect(result).toEqual(mockProduct);
-      expect(prisma.product.delete).toHaveBeenCalledWith({
-        where: { id: "test-uuid" },
-      });
+      expect(productRepository.remove).toHaveBeenCalledWith("test-uuid");
     });
 
     it("should throw NotFoundException when product not found", async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      productRepository.findById.mockResolvedValue(null);
 
       await expect(service.remove("nonexistent")).rejects.toThrow(
         NotFoundException,
