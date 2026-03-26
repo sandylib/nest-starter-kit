@@ -35,7 +35,6 @@
   "license": "ISC",
   "description": "NestJS starter kit with Clean Architecture, Prisma, Swagger, and structured logging",
   "devDependencies": {
-    "@leap/eslint-config-content-creator": "^0.1.1",
     "@nestjs/cli": "^11.0.10",
     "@nestjs/schematics": "^11.0.7",
     "@nestjs/testing": "^11.1.6",

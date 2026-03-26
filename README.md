@@ -7,7 +7,6 @@ NestJS starter kit with Clean Architecture, Prisma ORM, Swagger API documentatio
 - **Node.js** >= 22.0.0
 - **npm** >= 10.0.0
 - **Docker** (for local PostgreSQL database)
-- Access to the `@leap` Artifactory npm registry
 
 ## Quick Start
 

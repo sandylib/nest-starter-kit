@@ -7,4 +7,7 @@ export const BUSINESS_ERROR_MESSAGES = {
   CART_NOT_ACTIVE: "Cart is no longer active",
   PRODUCT_NOT_FOUND: "Product not found",
   CART_ITEM_NOT_FOUND: "Cart item not found",
+  UNSUPPORTED_PAYMENT_METHOD: "Unsupported payment method",
+  INVALID_PAYMENT_DETAILS: "Invalid payment details for the selected method",
+  PAYMENT_PROCESSING_FAILED: "Payment processing failed",
 } as const;

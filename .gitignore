@@ -43,3 +43,5 @@ ecosystem.config.js
 
 # Tests
 test-results/
+.DS_Store
+

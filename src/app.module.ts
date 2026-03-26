@@ -10,6 +10,7 @@ import {
   MonitoringModule,
   ProductsModule,
   CartsModule,
+  PaymentsModule,
   LoggingModule,
 } from "./infrastructure/modules";
 import { AuthMiddleware, LoggingMiddleware } from "./core";
@@ -25,6 +26,7 @@ import { AppConfigProvider } from "./infrastructure/config/app-config.provider";
     MonitoringModule,
     ProductsModule,
     CartsModule,
+    PaymentsModule,
   ],
   providers: [AppConfigProvider],
   exports: [AppConfigProvider],
