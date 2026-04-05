@@ -35,7 +35,7 @@ export class PaymentsController {
     @CurrentUser("userId") userId: string,
     @Body() dto: CheckoutDto,
   ): Promise<PaymentResponseDto> {
-    const result = await this.paymentsService.checkout(
+    const payment = await this.paymentsService.checkout(
       userId,
       dto.cartId,
       dto.paymentMethod as PaymentMethod,
@@ -45,15 +45,14 @@ export class PaymentsController {
     );
 
     return {
-      transactionId: result.transactionId,
-      status: result.status,
-      method: result.method,
-      amount: result.amount,
-      currency: result.currency,
-      fee: this.paymentsService
-        .getSupportedMethods()
-        .find((m) => m.method === result.method)?.sampleFee ?? 0,
-      processedAt: result.processedAt,
+      transactionId: payment.transactionId,
+      status: payment.status,
+      method: payment.method,
+      amount: payment.amount,
+      currency: payment.currency,
+      fee: payment.fee,
+      processedAt: payment.processedAt,
+      metadata: payment.metadata,
     };
   }
 

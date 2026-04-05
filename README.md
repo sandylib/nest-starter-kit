@@ -85,6 +85,8 @@ src/
 │   ├── entities/                        # Domain entities (pure interfaces)
 │   └── middleware/                       # Auth, logging middleware
 ├── application/                         # Application layer
+│   ├── factories/                       # Record construction (Factory pattern)
+│   ├── strategies/                      # Behavioral rules (Strategy pattern)
 │   └── use-cases/                       # Service implementations
 ├── presentation/                        # Presentation layer
 │   └── web/
@@ -113,7 +115,7 @@ src/
 This project follows **Clean Architecture** principles:
 
 - **Core (Domain)**: Business entities and domain logic
-- **Application**: Use cases and business rules
+- **Application**: Use cases, strategies (behavioral rules), and factories (record construction)
 - **Presentation**: HTTP controllers, DTOs, and web layer
 - **Infrastructure**: External dependencies, adapters, configuration
 - **Shared**: Constants, types, and utilities used across layers
@@ -126,14 +128,25 @@ Presentation → Application → Infrastructure
                  Shared (used by all)
 ```
 
-## Example Domain: Shopping Cart
+## Example Domain: Shopping Cart & Payments
 
-The starter kit includes a shopping cart example with:
+The starter kit includes a shopping cart and payment processing example:
 
 - **Products** -- CRUD operations (`GET/POST/PUT/DELETE /products`)
 - **Carts** -- Cart management (`POST /carts`, `GET /carts/:id`)
 - **Cart Items** -- Add/remove items (`POST/DELETE /carts/:id/items`)
+- **Payments** -- Checkout with multiple payment methods (`POST /payments/checkout`, `GET /payments/methods`)
 - **Monitoring** -- Health checks (`GET /healthcheck`, `GET /pingdom`)
+
+### Payment Architecture
+
+Payments demonstrate the **Strategy + Factory** pattern:
+
+- **Strategy Pattern** handles behavioral rules: processing, validation, and fee calculation per payment method
+- **Factory Pattern** handles record construction: building `Payment` entities with method-specific metadata
+- **Registry** resolves both strategies and factories by `PaymentMethod`
+
+Supported methods: Credit Card, PayPal, Bank Transfer. See [docs/coding-standards.md](docs/coding-standards.md) for details.
 
 ## Key Features
 

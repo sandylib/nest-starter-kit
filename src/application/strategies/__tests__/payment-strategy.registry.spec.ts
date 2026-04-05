@@ -4,6 +4,9 @@ import { PaymentMethod } from "../payment.strategy";
 import { CreditCardPaymentStrategy } from "../credit-card-payment.strategy";
 import { PayPalPaymentStrategy } from "../paypal-payment.strategy";
 import { BankTransferPaymentStrategy } from "../bank-transfer-payment.strategy";
+import { CreditCardRecordFactory } from "../../factories/credit-card-record.factory";
+import { PayPalRecordFactory } from "../../factories/paypal-record.factory";
+import { BankTransferRecordFactory } from "../../factories/bank-transfer-record.factory";
 
 describe("PaymentStrategyRegistry", () => {
   let registry: PaymentStrategyRegistry;
@@ -33,6 +36,32 @@ describe("PaymentStrategyRegistry", () => {
 
     it("should throw BadRequestException for unknown method", () => {
       expect(() => registry.resolve("crypto" as PaymentMethod)).toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe("resolveFactory", () => {
+    it("should resolve CreditCardRecordFactory for CREDIT_CARD", () => {
+      const factory = registry.resolveFactory(PaymentMethod.CREDIT_CARD);
+      expect(factory).toBeInstanceOf(CreditCardRecordFactory);
+      expect(factory.method).toBe(PaymentMethod.CREDIT_CARD);
+    });
+
+    it("should resolve PayPalRecordFactory for PAYPAL", () => {
+      const factory = registry.resolveFactory(PaymentMethod.PAYPAL);
+      expect(factory).toBeInstanceOf(PayPalRecordFactory);
+      expect(factory.method).toBe(PaymentMethod.PAYPAL);
+    });
+
+    it("should resolve BankTransferRecordFactory for BANK_TRANSFER", () => {
+      const factory = registry.resolveFactory(PaymentMethod.BANK_TRANSFER);
+      expect(factory).toBeInstanceOf(BankTransferRecordFactory);
+      expect(factory.method).toBe(PaymentMethod.BANK_TRANSFER);
+    });
+
+    it("should throw BadRequestException for unknown method", () => {
+      expect(() => registry.resolveFactory("crypto" as PaymentMethod)).toThrow(
         BadRequestException,
       );
     });

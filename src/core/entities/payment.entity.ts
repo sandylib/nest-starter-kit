@@ -8,4 +8,5 @@ export interface Payment {
   currency: string;
   fee: number;
   processedAt: Date;
+  metadata: Record<string, unknown>;
 }

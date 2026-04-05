@@ -1,10 +1,7 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
+import { Payment } from "../../core/entities/payment.entity";
 import { PaymentStrategyRegistry } from "../strategies/payment-strategy.registry";
-import {
-  PaymentMethod,
-  PaymentInput,
-  PaymentResult,
-} from "../strategies/payment.strategy";
+import { PaymentMethod, PaymentInput } from "../strategies/payment.strategy";
 import { CartsService } from "./carts.service";
 import { LoggerProvider } from "../../infrastructure/logging/logger.provider";
 import { BUSINESS_ERROR_MESSAGES } from "../../shared/constants/errors/business-errors.constants";
@@ -26,7 +23,7 @@ export class PaymentsService {
     amount: number,
     currency: string,
     paymentDetails?: Record<string, unknown>,
-  ): Promise<PaymentResult> {
+  ): Promise<Payment> {
     this.logger.info("Processing checkout", LOGGING.CATEGORIES.API, {
       userId,
       cartId,
@@ -49,15 +46,19 @@ export class PaymentsService {
 
     const input: PaymentInput = { amount, currency, cartId, userId };
     const result = await strategy.processPayment(input);
+    const fee = strategy.getTransactionFee(amount);
+
+    const factory = this.strategyRegistry.resolveFactory(method);
+    const record = factory.buildTransactionRecord(input, result, fee);
 
     this.logger.info("Payment processed", LOGGING.CATEGORIES.API, {
-      transactionId: result.transactionId,
-      status: result.status,
-      method: result.method,
-      fee: strategy.getTransactionFee(amount),
+      transactionId: record.transactionId,
+      status: record.status,
+      method: record.method,
+      fee: record.fee,
     });
 
-    return result;
+    return record;
   }
 
   getSupportedMethods() {

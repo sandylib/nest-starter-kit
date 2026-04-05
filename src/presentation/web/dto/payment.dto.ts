@@ -53,6 +53,12 @@ export class PaymentResponseDto {
 
   @ApiProperty({ description: "Timestamp of payment processing" })
   processedAt: Date;
+
+  @ApiPropertyOptional({
+    description: "Payment-method-specific metadata (provider, settlement info)",
+  })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 }
 
 export class PaymentMethodResponseDto {

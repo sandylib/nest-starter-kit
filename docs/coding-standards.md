@@ -7,16 +7,17 @@ This document defines the coding standards and architectural principles for Nest
 ## Table of Contents
 
 1. [Clean Architecture Structure](#clean-architecture-structure)
-2. [Controller Standards](#controller-standards)
-3. [Error Handling](#error-handling)
-4. [Configuration Management](#configuration-management)
-5. [Constants Organization](#constants-organization)
-6. [Logging Standards](#logging-standards)
-7. [HTTP Client Standards](#http-client-standards)
-8. [API Documentation Standards](#api-documentation-standards)
-9. [Naming Conventions](#naming-conventions)
-10. [Function Standards](#function-standards)
-11. [Build Pipeline](#build-pipeline)
+2. [Strategy and Factory Patterns](#strategy-and-factory-patterns)
+3. [Controller Standards](#controller-standards)
+4. [Error Handling](#error-handling)
+5. [Configuration Management](#configuration-management)
+6. [Constants Organization](#constants-organization)
+7. [Logging Standards](#logging-standards)
+8. [HTTP Client Standards](#http-client-standards)
+9. [API Documentation Standards](#api-documentation-standards)
+10. [Naming Conventions](#naming-conventions)
+11. [Function Standards](#function-standards)
+12. [Build Pipeline](#build-pipeline)
 
 ---
 
@@ -30,6 +31,8 @@ src/
 │   ├── entities/             # Domain entities (pure interfaces)
 │   └── middleware/           # Auth, logging middleware
 ├── application/               # Application layer
+│   ├── factories/            # Record/payload construction (Factory pattern)
+│   ├── strategies/           # Behavioral rules (Strategy pattern)
 │   └── use-cases/            # Service implementations
 ├── presentation/              # Presentation layer
 │   └── web/
@@ -89,10 +92,95 @@ src/
 ```
 
 * **Domain**: Business entities and core domain logic
-* **Application**: Use cases, business rules, and application-specific errors
+* **Application**: Use cases, business rules, strategies (behavioral rules), and factories (record construction)
 * **Presentation**: HTTP controllers, decorators, and web layer concerns
 * **Infrastructure**: External dependencies, adapters, configuration, and NestJS modules
 * **Shared**: Common utilities, constants, and type definitions used across all layers
+
+---
+
+## Strategy and Factory Patterns
+
+The application layer uses two complementary patterns to separate **behavioral rules** from **record construction**.
+
+### Strategy Pattern -- Behavioral Rules
+
+Strategies define how a domain variant behaves: processing logic, validation, and fee calculation.
+
+```typescript
+export interface PaymentStrategy {
+  readonly method: PaymentMethod;
+  processPayment(input: PaymentInput): Promise<PaymentResult>;
+  validatePaymentDetails(details: Record<string, unknown>): boolean;
+  getTransactionFee(amount: number): number;
+}
+```
+
+| Method | Purpose |
+|--------|---------|
+| `processPayment` | Execute the payment flow for this method |
+| `validatePaymentDetails` | Validate method-specific input (card number, email, etc.) |
+| `getTransactionFee` | Calculate the fee for a given amount |
+
+Each payment method implements this interface: `CreditCardPaymentStrategy`, `PayPalPaymentStrategy`, `BankTransferPaymentStrategy`.
+
+### Factory Pattern -- Record Construction
+
+Factories construct domain entities with method-specific metadata. They transform strategy results into complete records.
+
+```typescript
+export interface PaymentRecordFactory {
+  readonly method: PaymentMethod;
+  buildTransactionRecord(
+    input: PaymentInput,
+    result: PaymentResult,
+    fee: number,
+  ): Payment;
+}
+```
+
+A shared `buildBaseRecord` helper constructs the common fields so each factory only adds its `metadata`.
+
+| Factory | Metadata |
+|---------|----------|
+| `CreditCardRecordFactory` | `provider`, `cardBrand`, `last4` |
+| `PayPalRecordFactory` | `provider`, `payerEmail`, `paypalOrderId` |
+| `BankTransferRecordFactory` | `provider`, `estimatedSettlement`, `reference` |
+
+### Registry
+
+`PaymentStrategyRegistry` manages both strategies and factories:
+
+| Method | Returns |
+|--------|---------|
+| `resolve(method)` | `PaymentStrategy` |
+| `resolveFactory(method)` | `PaymentRecordFactory` |
+| `getSupportedMethods()` | `PaymentMethod[]` |
+
+### Checkout Flow
+
+```text
+Controller -> Service -> Registry.resolve(method)     -> Strategy
+                      -> strategy.processPayment()    -> PaymentResult
+                      -> Registry.resolveFactory()    -> Factory
+                      -> factory.buildTransactionRecord() -> Payment
+```
+
+### Adding a New Payment Method
+
+1. Add the enum value to `PaymentMethod`
+2. Create a new strategy class implementing `PaymentStrategy`
+3. Create a new factory class implementing `PaymentRecordFactory`
+4. Register both in `PaymentStrategyRegistry` constructor
+5. Update `CheckoutDto` enum validation
+
+### Rules
+
+* Strategy classes contain only behavioral logic -- no record construction
+* Factory classes contain only construction logic -- no processing or validation
+* Both are resolved through the registry, never instantiated directly in services
+* Factories use the shared `buildBaseRecord` helper for common fields
+* Method-specific data goes in the `Payment.metadata` field
 
 ---
 
@@ -304,3 +392,6 @@ npm run validate
 * [ ] Naming conventions are followed.
 * [ ] Type safety is maintained.
 * [ ] Build pipeline passes (type-check, lint, test).
+* [ ] New payment methods have both a strategy and a factory registered.
+* [ ] Factories use `buildBaseRecord` for common fields; method-specific data goes in `metadata`.
+* [ ] Services use the registry to resolve strategies and factories -- no direct instantiation.
