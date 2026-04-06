@@ -10,4 +10,5 @@ export const BUSINESS_ERROR_MESSAGES = {
   UNSUPPORTED_PAYMENT_METHOD: "Unsupported payment method",
   INVALID_PAYMENT_DETAILS: "Invalid payment details for the selected method",
   PAYMENT_PROCESSING_FAILED: "Payment processing failed",
+  CART_EMPTY: "Cart is empty",
 } as const;

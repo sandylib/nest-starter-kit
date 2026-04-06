@@ -11,6 +11,7 @@ import {
   ProductsModule,
   CartsModule,
   PaymentsModule,
+  CheckoutModule,
   LoggingModule,
 } from "./infrastructure/modules";
 import { AuthMiddleware, LoggingMiddleware } from "./core";
@@ -27,6 +28,7 @@ import { AppConfigProvider } from "./infrastructure/config/app-config.provider";
     ProductsModule,
     CartsModule,
     PaymentsModule,
+    CheckoutModule,
   ],
   providers: [AppConfigProvider],
   exports: [AppConfigProvider],

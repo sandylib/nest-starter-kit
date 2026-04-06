@@ -12,14 +12,15 @@ datasource db {
 }
 
 model Product {
-  id          String     @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String?
-  price       Decimal    @db.Decimal(10, 2)
-  stock       Int        @default(0)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  price       Decimal     @db.Decimal(10, 2)
+  stock       Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
   cartItems   CartItem[]
+  orderItems  OrderItem[]
 
   @@index([name])
   @@map("products")
@@ -30,6 +31,7 @@ model Cart {
   userId    String     @map("user_id")
   status    String     @default("active")
   items     CartItem[]
+  orders    Order[]
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
@@ -49,4 +51,43 @@ model CartItem {
 
   @@unique([cartId, productId])
   @@map("cart_items")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  cartId      String      @map("cart_id")
+  status      String      @default("confirmed")
+  totalAmount Decimal     @db.Decimal(10, 2) @map("total_amount")
+  items       OrderItem[]
+  invoice     Invoice?
+  cart        Cart        @relation(fields: [cartId], references: [id])
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2) @map("unit_price")
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  orderId     String   @unique @map("order_id")
+  invoiceNo   String   @unique @map("invoice_no")
+  totalAmount Decimal  @db.Decimal(10, 2) @map("total_amount")
+  issuedAt    DateTime @default(now()) @map("issued_at")
+  order       Order    @relation(fields: [orderId], references: [id])
+
+  @@map("invoices")
 }
