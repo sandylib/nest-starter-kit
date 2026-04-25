@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -89,6 +90,78 @@ export class CartsService {
       data: { cartId, productId, quantity },
       include: { product: true },
     });
+  }
+
+  async upsertItem(
+    cartId: string,
+    productId: string,
+    quantity: number,
+    version?: number,
+  ) {
+    const cart = await this.findById(cartId);
+
+    if (cart.status !== CARTS.STATUS.ACTIVE) {
+      throw new BadRequestException(BUSINESS_ERROR_MESSAGES.CART_NOT_ACTIVE);
+    }
+
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException(BUSINESS_ERROR_MESSAGES.PRODUCT_NOT_FOUND);
+    }
+
+    if (product.stock < quantity) {
+      throw new BadRequestException(BUSINESS_ERROR_MESSAGES.INSUFFICIENT_STOCK);
+    }
+
+    this.logger.info("Upserting item in cart", LOGGING.CATEGORIES.API, {
+      cartId,
+      productId,
+      quantity,
+      version,
+    });
+
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const existing = await tx.cartItem.findUnique({
+            where: { cartId_productId: { cartId, productId } },
+          });
+
+          if (existing && version !== undefined && version !== existing.version) {
+            throw new ConflictException(
+              "Cart item version mismatch. Please refresh and try again.",
+            );
+          }
+
+          if (existing) {
+            return tx.cartItem.update({
+              where: { id: existing.id },
+              data: {
+                quantity,
+                version: existing.version + 1,
+              },
+              include: { product: true },
+            });
+          }
+
+          return tx.cartItem.create({
+            data: { cartId, productId, quantity, version: 1 },
+            include: { product: true },
+          });
+        });
+      } catch (e: any) {
+        if (e?.code === "P2002" && attempt < MAX_RETRIES - 1) {
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    throw new Error("upsertItem: exhausted retries");
   }
 
   async removeItem(cartId: string, itemId: string) {

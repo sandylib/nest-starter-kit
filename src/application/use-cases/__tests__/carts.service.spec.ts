@@ -1,5 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 import { CartsService } from "../carts.service";
 import { PrismaAdapter } from "../../../infrastructure/adapters/prisma.adapter";
 import { LoggerProvider } from "../../../infrastructure/logging/logger.provider";
@@ -32,12 +36,23 @@ describe("CartsService", () => {
     cartId: "cart-1",
     productId: "product-1",
     quantity: 2,
+    version: 1,
     product: mockProduct,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
+  let mockTx: any;
+
   beforeEach(async () => {
+    mockTx = {
+      cartItem: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+
     const mockPrisma = {
       cart: {
         create: jest.fn(),
@@ -53,6 +68,7 @@ describe("CartsService", () => {
       product: {
         findUnique: jest.fn(),
       },
+      $transaction: jest.fn((callback) => callback(mockTx)),
     };
 
     const mockLogger = {
@@ -236,6 +252,113 @@ describe("CartsService", () => {
       await expect(service.remove("nonexistent")).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe("upsertItem", () => {
+    it("should create a new cart item when none exists", async () => {
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue(mockProduct);
+      mockTx.cartItem.findUnique.mockResolvedValue(null);
+      mockTx.cartItem.create.mockResolvedValue(mockCartItem);
+
+      const result = await service.upsertItem("cart-1", "product-1", 2);
+
+      expect(result).toEqual(mockCartItem);
+      expect(mockTx.cartItem.create).toHaveBeenCalledWith({
+        data: { cartId: "cart-1", productId: "product-1", quantity: 2, version: 1 },
+        include: { product: true },
+      });
+    });
+
+    it("should update quantity and increment version when item already exists", async () => {
+      const existingItem = { ...mockCartItem, quantity: 2, version: 1 };
+      const updatedItem = { ...mockCartItem, quantity: 5, version: 2 };
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue(mockProduct);
+      mockTx.cartItem.findUnique.mockResolvedValue(existingItem);
+      mockTx.cartItem.update.mockResolvedValue(updatedItem);
+
+      const result = await service.upsertItem("cart-1", "product-1", 5, 1);
+
+      expect(result.quantity).toBe(5);
+      expect(result.version).toBe(2);
+      expect(mockTx.cartItem.update).toHaveBeenCalledWith({
+        where: { id: "item-1" },
+        data: { quantity: 5, version: 2 },
+        include: { product: true },
+      });
+    });
+
+    it("should throw ConflictException when client version is stale", async () => {
+      const existingItem = { ...mockCartItem, quantity: 3, version: 2 };
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue(mockProduct);
+      mockTx.cartItem.findUnique.mockResolvedValue(existingItem);
+
+      // Client sends version: 1 but the stored version is 2 (Tab A already updated it)
+      await expect(
+        service.upsertItem("cart-1", "product-1", 4, 1),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it("should retry and succeed when P2002 occurs on the first attempt", async () => {
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue(mockProduct);
+
+      const p2002Error = { code: "P2002" };
+
+      // First attempt: both concurrent requests reach create → P2002
+      // Second attempt: findUnique now returns the row the other request created
+      const existingItem = { ...mockCartItem, quantity: 2, version: 1 };
+      const updatedItem = { ...mockCartItem, quantity: 2, version: 2 };
+
+      (prisma.$transaction as jest.Mock)
+        .mockImplementationOnce(() => Promise.reject(p2002Error))
+        .mockImplementationOnce((callback) => {
+          mockTx.cartItem.findUnique.mockResolvedValueOnce(existingItem);
+          mockTx.cartItem.update.mockResolvedValueOnce(updatedItem);
+          return callback(mockTx);
+        });
+
+      const result = await service.upsertItem("cart-1", "product-1", 2);
+
+      expect(result.version).toBe(2);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("should rethrow P2002 after exhausting all retries", async () => {
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue(mockProduct);
+
+      const p2002Error = { code: "P2002" };
+      (prisma.$transaction as jest.Mock).mockRejectedValue(p2002Error);
+
+      await expect(
+        service.upsertItem("cart-1", "product-1", 2),
+      ).rejects.toEqual(p2002Error);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    });
+
+    it("should throw BadRequestException when cart is not active", async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        ...mockCart,
+        status: "completed",
+      });
+
+      await expect(
+        service.upsertItem("cart-1", "product-1", 1),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should throw BadRequestException when stock is insufficient", async () => {
+      prisma.cart.findUnique.mockResolvedValue(mockCart);
+      prisma.product.findUnique.mockResolvedValue({ ...mockProduct, stock: 0 });
+
+      await expect(
+        service.upsertItem("cart-1", "product-1", 5),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

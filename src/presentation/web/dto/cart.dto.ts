@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsString, IsNumber, Min } from "class-validator";
+import { IsString, IsNumber, Min, IsOptional } from "class-validator";
 import { ProductResponseDto } from "./product.dto";
 
 export class AddToCartDto {
@@ -11,6 +11,15 @@ export class AddToCartDto {
   @IsNumber()
   @Min(1)
   quantity: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Current version of the cart item known to the client. If provided and it does not match the stored version, the request is rejected with 409 to prevent lost updates.",
+    example: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  version?: number;
 }
 
 export class CartItemResponseDto {
@@ -25,6 +34,13 @@ export class CartItemResponseDto {
 
   @ApiProperty({ description: "Quantity" })
   quantity: number;
+
+  @ApiProperty({
+    description:
+      "Optimistic concurrency version. Echo this back on the next write to prevent lost updates.",
+    example: 1,
+  })
+  version: number;
 
   @ApiPropertyOptional({
     description: "Product details",
